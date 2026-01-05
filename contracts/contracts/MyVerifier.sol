@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-contract MockVerifier {
+contract MyVerifier {
     function verifyProof(
         uint256[2] memory,
         uint256[2][2] memory,

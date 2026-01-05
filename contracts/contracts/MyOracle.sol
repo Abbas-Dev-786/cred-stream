@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-contract MockOracle {
+contract MyOracle {
     uint256 public price;
 
     constructor(uint256 _price) {
