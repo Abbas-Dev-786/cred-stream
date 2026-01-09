@@ -1,23 +1,17 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Nunito_Sans } from "next/font/google";
+import { Inter } from "next/font/google";
 import "./globals.css";
 import { ThirdwebProvider } from "thirdweb/react";
+import { Navbar } from "@/components/Navbar";
 
-const nunitoSans = Nunito_Sans({ variable: '--font-sans' });
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const inter = Inter({
   subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
+  variable: "--font-sans",
 });
 
 export const metadata: Metadata = {
-  title: "CredStream",
-  description: "Mantle RWA Factoring",
+  title: "CredStream | Decentralized Invoice Factoring",
+  description: "Unlock liquidity from your invoices with AI-powered risk scoring on Mantle Network",
 };
 
 export default function RootLayout({
@@ -26,11 +20,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={nunitoSans.variable}>
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
-        <ThirdwebProvider>{children}</ThirdwebProvider>
+    <html lang="en" className="dark">
+      <body className={`${inter.variable} font-sans antialiased`}>
+        <ThirdwebProvider>
+          <Navbar />
+          <main className="pt-16">{children}</main>
+        </ThirdwebProvider>
       </body>
     </html>
   );

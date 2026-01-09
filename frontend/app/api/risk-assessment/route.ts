@@ -3,19 +3,23 @@ import { NextResponse } from "next/server";
 import { ethers } from "ethers";
 import OpenAI from "openai";
 
-// Initialize OpenAI
+// Initialize OpenAI (lazy - only used if API key exists)
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+  apiKey: process.env.OPENAI_API_KEY || "",
 });
-
-// Initialize the AI Agent's Wallet (Server-side only)
-if (!process.env.AI_AGENT_PRIVATE_KEY) {
-  throw new Error("Missing AI_AGENT_PRIVATE_KEY in environment variables");
-}
-const aiWallet = new ethers.Wallet(process.env.AI_AGENT_PRIVATE_KEY);
 
 export async function POST(req: Request) {
   try {
+    // Initialize the AI Agent's Wallet at request time (not build time)
+    const privateKey = process.env.AI_AGENT_PRIVATE_KEY;
+    if (!privateKey) {
+      return NextResponse.json(
+        { error: "Server configuration error: Missing AI_AGENT_PRIVATE_KEY" },
+        { status: 500 }
+      );
+    }
+    const aiWallet = new ethers.Wallet(privateKey);
+
     const body = await req.json();
     const { supplier, principal, buyer, invoiceText } = body;
 
