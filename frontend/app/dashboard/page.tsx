@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useCallback } from "react";
-import { ethers } from "ethers";
+import { useState, useCallback, useEffect } from "react";
+import { ethers, formatUnits } from "ethers";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -12,9 +12,11 @@ import { ProcessStep } from "@/components/ProcessStep";
 import { InvoiceCard } from "@/components/InvoiceCard";
 import { client } from "@/lib/thirdweb-client";
 import { getContract, prepareContractCall } from "thirdweb";
+import { getOwnedNFTs } from "thirdweb/extensions/erc721";
 import {
     useActiveAccount,
     useSendTransaction,
+    useReadContract,
     ConnectButton,
 } from "thirdweb/react";
 import { MANTLE_SEPOLIA, CONTRACTS } from "@/lib/constants";
@@ -31,18 +33,51 @@ import {
     X,
 } from "lucide-react";
 
-// Dummy invoice data for portfolio display
-const dummyInvoices = [
-    { id: "1001", amount: "5,000", status: "active" as const, dueDate: "Feb 15, 2026" },
-    { id: "1002", amount: "12,500", status: "active" as const, dueDate: "Mar 01, 2026" },
-    { id: "1003", amount: "3,200", status: "repaid" as const, dueDate: "Jan 10, 2026" },
-];
-
 type ProcessStatus = "idle" | "uploading" | "analyzing" | "minting" | "complete";
 
 export default function DashboardPage() {
     const account = useActiveAccount();
-    const { mutate: sendTx, isPending: isMinting } = useSendTransaction();
+    const { mutate: sendTx, isPending: isTxPending } = useSendTransaction();
+
+    // Contracts
+    const nftContract = getContract({
+        client,
+        chain: MANTLE_SEPOLIA,
+        address: CONTRACTS.nft,
+    });
+
+    const vaultContract = getContract({
+        client,
+        chain: MANTLE_SEPOLIA,
+        address: CONTRACTS.vault,
+    });
+
+    const usdyContract = getContract({
+        client,
+        chain: MANTLE_SEPOLIA,
+        address: CONTRACTS.usdy,
+    });
+
+    // --- FETCH USER INVOICES ---
+    // Fetch NFTs owned by the user
+    const { data: ownedNFTs, isLoading: isLoadingNFTs } = useReadContract(
+        getOwnedNFTs,
+        {
+            contract: nftContract,
+            owner: account?.address || "",
+        }
+    );
+
+    // Calculate total borrowed from active invoices
+    // Assuming principal is in metadata attributes or we parse it from the request if stored there? 
+    // For now, valid metadata usually has "attributes".
+    const totalBorrowed = ownedNFTs?.reduce((acc, nft) => {
+        // Try to find "Principal" trait
+        // @ts-ignore
+        const principalTrait = nft.metadata?.attributes?.find((a: any) => a.trait_type === "Principal" || a.trait_type === "Amount");
+        const val = principalTrait ? parseFloat(principalTrait.value) : 0;
+        return acc + val;
+    }, 0) || 0;
 
     // Form state
     const [file, setFile] = useState<File | null>(null);
@@ -55,6 +90,9 @@ export default function DashboardPage() {
     const [riskScore, setRiskScore] = useState<number | null>(null);
     const [signature, setSignature] = useState("");
     const [error, setError] = useState<string | null>(null);
+
+    // Repay State
+    const [repayingId, setRepayingId] = useState<string | null>(null);
 
     // Drag and drop state
     const [isDragging, setIsDragging] = useState(false);
@@ -208,6 +246,59 @@ export default function DashboardPage() {
         }
     };
 
+    // --- REPAYMENT LOGIC ---
+    const handleRepay = async (tokenId: string, amount: string) => {
+        if (!account) return;
+        setRepayingId(tokenId);
+
+        try {
+            // 1. Approve Vault to spend USDy
+            // Need to approve the specific amount (or Repayment Amount)
+            // Assuming amount string is human readable, need to parse.
+            // But wait! Is 'amount' passed here normalized?
+            // Let's assume passed amount is formatted (e.g. "5000").
+            // We need to verify decimals. If principal input was 18 decimals, then here too.
+            // Safe bet: Parse as 18 decimals.
+            const repayAmountWei = ethers.parseUnits(amount.replace(/,/g, ''), 18);
+
+            const approveTx = prepareContractCall({
+                contract: usdyContract,
+                method: "function approve(address spender, uint256 amount)",
+                params: [CONTRACTS.vault, BigInt(repayAmountWei.toString())],
+            });
+
+            sendTx(approveTx, {
+                onSuccess: () => {
+                    // 2. Repay Loan
+                    const repayTx = prepareContractCall({
+                        contract: vaultContract,
+                        method: "function repayLoan(uint256 tokenId)",
+                        params: [BigInt(tokenId)],
+                    });
+
+                    sendTx(repayTx, {
+                        onSuccess: () => {
+                            setRepayingId(null);
+                            // Ideally refresh list
+                        },
+                        onError: (err) => {
+                            console.error(err);
+                            setRepayingId(null);
+                        }
+                    });
+                },
+                onError: (err) => {
+                    console.error(err);
+                    setRepayingId(null);
+                }
+            });
+
+        } catch (e) {
+            console.error(e);
+            setRepayingId(null);
+        }
+    };
+
     // Reset the form
     const handleReset = () => {
         setFile(null);
@@ -220,7 +311,6 @@ export default function DashboardPage() {
         setError(null);
     };
 
-    // Risk score color
     const getRiskColor = (score: number) => {
         if (score >= 80) return "text-primary bg-primary/10 border-primary/30";
         if (score >= 60) return "text-accent bg-accent/10 border-accent/30";
@@ -289,10 +379,10 @@ export default function DashboardPage() {
                                     onDragOver={handleDragOver}
                                     onDragLeave={handleDragLeave}
                                     className={`relative border-2 border-dashed rounded-xl p-8 text-center transition-all ${isDragging
-                                            ? "border-primary bg-primary/5"
-                                            : file
-                                                ? "border-primary/50 bg-primary/5"
-                                                : "border-border hover:border-muted-foreground"
+                                        ? "border-primary bg-primary/5"
+                                        : file
+                                            ? "border-primary/50 bg-primary/5"
+                                            : "border-border hover:border-muted-foreground"
                                         }`}
                                 >
                                     {file ? (
@@ -437,11 +527,11 @@ export default function DashboardPage() {
                                     ) : (
                                         <Button
                                             onClick={handleMint}
-                                            disabled={isMinting || status === "minting"}
+                                            disabled={isTxPending || status === "minting"}
                                             className="flex-1"
                                             size="lg"
                                         >
-                                            {isMinting || status === "minting" ? (
+                                            {isTxPending || status === "minting" ? (
                                                 <>
                                                     <Loader2 className="h-5 w-5 mr-2 animate-spin" />
                                                     Minting...
@@ -465,13 +555,13 @@ export default function DashboardPage() {
                         <div className="grid grid-cols-2 gap-4">
                             <StatCard
                                 label="Total Borrowed"
-                                value="$17,500"
+                                value={`$${totalBorrowed.toLocaleString()}`}
                                 icon={DollarSign}
                                 trend={{ value: "+12%", positive: true }}
                             />
                             <StatCard
                                 label="Active Invoices"
-                                value="2"
+                                value={ownedNFTs?.length.toString() || "0"}
                                 icon={TrendingUp}
                             />
                         </div>
@@ -482,20 +572,42 @@ export default function DashboardPage() {
                                 <CardTitle className="text-lg">Your Portfolio</CardTitle>
                             </CardHeader>
                             <CardContent className="space-y-3">
-                                {dummyInvoices.map((invoice) => (
-                                    <InvoiceCard
-                                        key={invoice.id}
-                                        id={invoice.id}
-                                        amount={invoice.amount}
-                                        status={invoice.status}
-                                        dueDate={invoice.dueDate}
-                                        onRepay={
-                                            invoice.status === "active"
-                                                ? () => console.log("Repay", invoice.id)
-                                                : undefined
-                                        }
-                                    />
-                                ))}
+                                {/* Loading State */}
+                                {isLoadingNFTs && (
+                                    <div className="text-center py-8 text-muted-foreground">
+                                        <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2" />
+                                        Loading invoices...
+                                    </div>
+                                )}
+
+                                {/* Empty State */}
+                                {!isLoadingNFTs && (!ownedNFTs || ownedNFTs.length === 0) && (
+                                    <div className="text-center py-8 text-muted-foreground">
+                                        No active invoices found.
+                                    </div>
+                                )}
+
+                                {/* Real Invoices */}
+                                {ownedNFTs?.map((nft) => {
+                                    // Extract amount from metadata or use default
+                                    // This depends on how the metadata is structured on IPFS
+                                    // For now, attempting to read standard traits or fallback
+                                    // @ts-ignore
+                                    const amountStr = nft.metadata?.attributes?.find((a: any) => a.trait_type === "Principal")?.value || "0";
+                                    const status = "active"; // Default to active since we own it
+
+                                    return (
+                                        <InvoiceCard
+                                            key={nft.id.toString()}
+                                            id={nft.id.toString()}
+                                            amount={amountStr}
+                                            status={status}
+                                            dueDate="30 Days" // Simplify for now
+                                            onRepay={() => handleRepay(nft.id.toString(), amountStr)}
+                                            isRepaying={repayingId === nft.id.toString()}
+                                        />
+                                    );
+                                })}
                             </CardContent>
                         </Card>
                     </div>
