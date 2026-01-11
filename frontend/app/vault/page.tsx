@@ -22,7 +22,6 @@ import {
     Coins,
     TrendingUp,
     Percent,
-    Users,
     Loader2,
     CheckCircle2,
     AlertCircle,
@@ -70,10 +69,26 @@ export default function VaultPage() {
         params: [account?.address || ethers.ZeroAddress],
     });
 
+    // 4. Total LP Shares in the Vault
+    const { data: totalSharesData } = useReadContract({
+        contract: vaultContract,
+        method: "function totalShares() view returns (uint256)",
+        params: [],
+    });
+
     // Formatted Values
     const userBalance = userBalanceData ? formatUnits(userBalanceData, 18) : "0";
     const tvl = tvlData ? formatUnits(tvlData, 18) : "0";
     const userShares = userSharesData ? formatUnits(userSharesData, 18) : "0";
+    const totalShares = totalSharesData ? formatUnits(totalSharesData, 18) : "0";
+
+    // Calculate user's share percentage and deposit value
+    const userSharePercent = totalShares !== "0"
+        ? ((parseFloat(userShares) / parseFloat(totalShares)) * 100).toFixed(2)
+        : "0";
+    const userDepositValue = totalShares !== "0"
+        ? ((parseFloat(userShares) / parseFloat(totalShares)) * parseFloat(tvl)).toFixed(2)
+        : "0";
 
     // Form state
     const [amount, setAmount] = useState("");
@@ -230,18 +245,24 @@ export default function VaultPage() {
                         </p>
                         <div className="flex items-center justify-center gap-2 text-accent">
                             <TrendingUp className="h-5 w-5" />
-                            <span className="text-lg font-medium">8.5% APY</span>
+                            <span className="text-lg font-medium">Est. APY: ~8-12%</span>
                         </div>
                     </CardContent>
                 </Card>
 
                 {/* Stats Row */}
-                <div className="grid sm:grid-cols-4 gap-4 mb-8">
-                    <StatCard label="Current APY" value="8.5%" icon={Percent} />
-                    <StatCard label="Total Depositors" value="340" icon={Users} />
-                    {/* Placeholder for fetching user specific deposit info from contract */}
-                    <StatCard label="Your Deposit" value="$0" icon={Wallet} />
-                    <StatCard label="Your Share" value="0%" icon={TrendingUp} />
+                <div className="grid sm:grid-cols-3 gap-4 mb-8">
+                    <StatCard label="Est. APY" value="~8-12%" icon={Percent} />
+                    <StatCard
+                        label="Your Deposit"
+                        value={`$${Number(userDepositValue).toLocaleString(undefined, { maximumFractionDigits: 2 })}`}
+                        icon={Wallet}
+                    />
+                    <StatCard
+                        label="Your Share"
+                        value={`${userSharePercent}%`}
+                        icon={TrendingUp}
+                    />
                 </div>
 
                 {/* Deposit/Withdraw Card */}

@@ -58,9 +58,16 @@ export default function DashboardPage() {
         address: CONTRACTS.usdy,
     });
 
+    // State for active loans (loans where user is borrower, NFT is in Vault)
+    const [activeLoans, setActiveLoans] = useState<Array<{
+        tokenId: string;
+        repaymentAmount: string;
+        usdyDisbursed: string;
+    }>>([]);
+
     // --- FETCH USER INVOICES ---
-    // Fetch NFTs owned by the user
-    const { data: ownedNFTs, isLoading: isLoadingNFTs } = useReadContract(
+    // Fetch NFTs owned by the user (unfunded invoices)
+    const { data: ownedNFTs, isLoading: isLoadingNFTs, refetch: refetchNFTs } = useReadContract(
         getOwnedNFTs,
         {
             contract: nftContract,
@@ -68,16 +75,81 @@ export default function DashboardPage() {
         }
     );
 
-    // Calculate total borrowed from active invoices
-    // Assuming principal is in metadata attributes or we parse it from the request if stored there? 
-    // For now, valid metadata usually has "attributes".
-    const totalBorrowed = ownedNFTs?.reduce((acc, nft) => {
-        // Try to find "Principal" trait
-        // @ts-ignore
-        const principalTrait = nft.metadata?.attributes?.find((a: any) => a.trait_type === "Principal" || a.trait_type === "Amount");
-        const val = principalTrait ? parseFloat(principalTrait.value) : 0;
-        return acc + val;
-    }, 0) || 0;
+    // --- FETCH ACTIVE LOANS (NFTs in Vault where user is borrower) ---
+    const [isLoadingLoans, setIsLoadingLoans] = useState(false);
+
+    // Function to fetch active loans by querying the loans mapping
+    const fetchActiveLoans = useCallback(async () => {
+        if (!account?.address) {
+            setActiveLoans([]);
+            return;
+        }
+
+        setIsLoadingLoans(true);
+        try {
+            // Create a provider to make direct RPC calls
+            const provider = new ethers.JsonRpcProvider("https://rpc.sepolia.mantle.xyz");
+
+            // Get recent LoanDisbursed events for this user
+            const vaultInterface = new ethers.Interface([
+                "event LoanDisbursed(uint256 indexed tokenId, address indexed borrower, uint256 usdyAmount, uint256 usdValue)",
+                "function loans(uint256) view returns (address borrower, uint256 usdyDisbursed, uint256 repaymentAmount)"
+            ]);
+
+            const vaultAddr = CONTRACTS.vault;
+            const borrowerFilter = vaultInterface.encodeFilterTopics("LoanDisbursed", [null, account.address]);
+
+            // Query events from recent blocks (last ~10000 blocks)
+            const currentBlock = await provider.getBlockNumber();
+            const fromBlock = Math.max(0, currentBlock - 10000);
+
+            const logs = await provider.getLogs({
+                address: vaultAddr,
+                topics: borrowerFilter,
+                fromBlock,
+                toBlock: "latest"
+            });
+
+            // Parse events and check if loans are still active
+            const loansData: Array<{ tokenId: string; repaymentAmount: string; usdyDisbursed: string }> = [];
+
+            for (const log of logs) {
+                const parsed = vaultInterface.parseLog({ topics: log.topics as string[], data: log.data });
+                if (parsed) {
+                    const tokenId = parsed.args[0].toString();
+
+                    // Check if loan is still active (borrower != 0x0)
+                    const contract = new ethers.Contract(vaultAddr, vaultInterface, provider);
+                    const loanInfo = await contract.loans(tokenId);
+
+                    if (loanInfo.borrower !== ethers.ZeroAddress) {
+                        loansData.push({
+                            tokenId,
+                            repaymentAmount: formatUnits(loanInfo.repaymentAmount, 18),
+                            usdyDisbursed: formatUnits(loanInfo.usdyDisbursed, 18),
+                        });
+                    }
+                }
+            }
+
+            setActiveLoans(loansData);
+        } catch (err) {
+            console.error("Error fetching active loans:", err);
+            setActiveLoans([]);
+        } finally {
+            setIsLoadingLoans(false);
+        }
+    }, [account?.address]);
+
+    // Fetch loans on mount and when account changes
+    useEffect(() => {
+        fetchActiveLoans();
+    }, [fetchActiveLoans]);
+
+    // Calculate total borrowed from active loans
+    const totalBorrowed = activeLoans.reduce((acc, loan) => {
+        return acc + parseFloat(loan.usdyDisbursed || "0");
+    }, 0);
 
     // Form state
     const [file, setFile] = useState<File | null>(null);
@@ -272,7 +344,9 @@ export default function DashboardPage() {
                     sendTx(financeTx, {
                         onSuccess: () => {
                             setFinancingId(null);
-                            // NFT moves to vault, refresh will remove from list
+                            // NFT moves to vault, refresh data
+                            refetchNFTs();
+                            fetchActiveLoans();
                         },
                         onError: (err) => {
                             console.error(err);
@@ -316,6 +390,9 @@ export default function DashboardPage() {
                     sendTx(repayTx, {
                         onSuccess: () => {
                             setRepayingId(null);
+                            // Refresh data after repayment
+                            fetchActiveLoans();
+                            refetchNFTs();
                         },
                         onError: (err) => {
                             console.error(err);
@@ -640,6 +717,45 @@ export default function DashboardPage() {
                                         />
                                     );
                                 })}
+                            </CardContent>
+                        </Card>
+
+                        {/* Active Loans (NFTs in Vault, ready to repay) */}
+                        <Card className="bg-card/50 backdrop-blur-md border-border/50">
+                            <CardHeader>
+                                <CardTitle className="text-lg flex items-center gap-2">
+                                    <Coins className="h-5 w-5 text-primary" />
+                                    Active Loans
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-3">
+                                {/* Loading State */}
+                                {isLoadingLoans && (
+                                    <div className="text-center py-8 text-muted-foreground">
+                                        <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2" />
+                                        Loading active loans...
+                                    </div>
+                                )}
+
+                                {/* Empty State */}
+                                {!isLoadingLoans && activeLoans.length === 0 && (
+                                    <div className="text-center py-8 text-muted-foreground">
+                                        No active loans. Finance an invoice to get started.
+                                    </div>
+                                )}
+
+                                {/* Active Loans List */}
+                                {activeLoans.map((loan) => (
+                                    <InvoiceCard
+                                        key={loan.tokenId}
+                                        id={loan.tokenId}
+                                        amount={parseFloat(loan.repaymentAmount).toLocaleString()}
+                                        status="active"
+                                        dueDate="30 Days"
+                                        onRepay={() => handleRepay(loan.tokenId, loan.repaymentAmount)}
+                                        isLoading={repayingId === loan.tokenId}
+                                    />
+                                ))}
                             </CardContent>
                         </Card>
                     </div>
