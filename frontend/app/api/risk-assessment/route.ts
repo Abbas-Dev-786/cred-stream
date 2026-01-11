@@ -27,6 +27,7 @@ export async function POST(req: Request) {
 
     // --- STEP 1: AI RISK ANALYSIS ---
     let riskScore = 0;
+    let usedFallback = false;
 
     try {
       // Real Groq Call - Uses Llama 3.3 70B for fast, accurate risk analysis
@@ -53,6 +54,7 @@ export async function POST(req: Request) {
       console.warn(
         "⚠️ Groq API failed or timed out. Using fallback scoring mechanism."
       );
+      usedFallback = true;
       // Fallback Logic: Simple check for demo purposes
       if (principal && Number(principal) < 100000) {
         riskScore = 88; // Low amount = Low risk
@@ -96,6 +98,7 @@ export async function POST(req: Request) {
       success: true,
       approved: true,
       riskScore,
+      usedFallback, // Let frontend know if AI was unavailable
       signature, // <--- The Frontend sends this to the Smart Contract
       messageHash,
     });
