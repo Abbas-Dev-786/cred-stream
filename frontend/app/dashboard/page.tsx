@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { StatCard } from "@/components/StatCard";
 import { ProcessStep } from "@/components/ProcessStep";
 import { InvoiceCard } from "@/components/InvoiceCard";
+import { RiskGauge } from "@/components/RiskGauge";
 import { client } from "@/lib/thirdweb-client";
 import { getContract, prepareContractCall } from "thirdweb";
 import { getOwnedNFTs } from "thirdweb/extensions/erc721";
@@ -166,6 +167,7 @@ export default function DashboardPage() {
     // Action States
     const [financingId, setFinancingId] = useState<string | null>(null);
     const [repayingId, setRepayingId] = useState<string | null>(null);
+    const [txHash, setTxHash] = useState<string | null>(null);
 
     // Drag and drop state
     const [isDragging, setIsDragging] = useState(false);
@@ -303,8 +305,12 @@ export default function DashboardPage() {
             });
 
             sendTx(transaction, {
-                onSuccess: () => {
+                onSuccess: (result) => {
                     setStatus("complete");
+                    // Capture transaction hash for explorer link
+                    if (result?.transactionHash) {
+                        setTxHash(result.transactionHash);
+                    }
                 },
                 onError: (err) => {
                     console.error(err);
@@ -421,6 +427,7 @@ export default function DashboardPage() {
         setRiskScore(null);
         setSignature("");
         setError(null);
+        setTxHash(null);
     };
 
     const getRiskColor = (score: number) => {
@@ -587,16 +594,31 @@ export default function DashboardPage() {
                                     />
                                 </div>
 
-                                {/* Risk Badge */}
+                                {/* Risk Score Gauge */}
                                 {riskScore !== null && (
-                                    <div className="flex items-center justify-center">
-                                        <Badge
-                                            variant="outline"
-                                            className={`text-lg px-4 py-2 ${getRiskColor(riskScore)}`}
+                                    <RiskGauge score={riskScore} className="py-4" />
+                                )}
+
+                                {/* Transaction Hash Display */}
+                                {txHash && status === "complete" && (
+                                    <div
+                                        className="bg-primary/10 border border-primary/30 rounded-lg p-4 text-center"
+                                        role="status"
+                                        aria-live="polite"
+                                    >
+                                        <p className="text-sm text-muted-foreground mb-2">Transaction Confirmed!</p>
+                                        <a
+                                            href={`https://sepolia.mantlescan.xyz/tx/${txHash}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-primary hover:underline text-sm font-mono break-all"
+                                            aria-label="View transaction on Mantle Explorer"
                                         >
-                                            <CheckCircle2 className="h-5 w-5 mr-2" />
-                                            {riskScore}/100 - {getRiskLabel(riskScore)}
-                                        </Badge>
+                                            {txHash.slice(0, 10)}...{txHash.slice(-8)}
+                                        </a>
+                                        <p className="text-xs text-muted-foreground mt-1">
+                                            View on Mantle Explorer →
+                                        </p>
                                     </div>
                                 )}
 

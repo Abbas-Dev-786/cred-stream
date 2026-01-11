@@ -124,3 +124,38 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Micro-animations for enhanced UX */
+@layer utilities {
+  /* Smooth button transitions */
+  .btn-animate {
+    @apply transition-all duration-200 ease-out;
+  }
+  
+  .btn-animate:hover {
+    @apply scale-[1.02] shadow-lg;
+  }
+  
+  .btn-animate:active {
+    @apply scale-[0.98];
+  }
+
+  /* Step transition animations */
+  .step-animate {
+    @apply transition-all duration-300 ease-in-out;
+  }
+
+  /* Card hover effect */
+  .card-hover {
+    @apply transition-all duration-200 ease-out;
+  }
+  
+  .card-hover:hover {
+    @apply shadow-lg border-primary/30 -translate-y-0.5;
+  }
+
+  /* Focus visible styles for accessibility */
+  .focus-ring:focus-visible {
+    @apply outline-none ring-2 ring-primary ring-offset-2 ring-offset-background;
+  }
+}

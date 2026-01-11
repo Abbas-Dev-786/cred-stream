@@ -63,12 +63,16 @@ export async function POST(req: Request) {
 
     console.log(`📊 Calculated Risk Score: ${riskScore}/100`);
 
-    if (riskScore < 70) {
+    // Configurable threshold via environment variable (default: 70)
+    const riskThreshold = parseInt(process.env.RISK_THRESHOLD || "70", 10);
+
+    if (riskScore < riskThreshold) {
       return NextResponse.json(
         {
           approved: false,
           riskScore,
-          reason: "Risk score below threshold (70).",
+          threshold: riskThreshold,
+          reason: `Risk score below threshold (${riskThreshold}).`,
         },
         { status: 400 }
       );

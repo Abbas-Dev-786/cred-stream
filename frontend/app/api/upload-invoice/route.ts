@@ -13,7 +13,25 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "No file uploaded" }, { status: 400 });
     }
 
-    console.log(`📦 Uploading ${file.name} to IPFS via Pinata...`);
+    // 2. Validate file type (PDF only)
+    const allowedTypes = ["application/pdf"];
+    if (!allowedTypes.includes(file.type)) {
+      return NextResponse.json(
+        { error: "Invalid file type. Only PDF files are accepted." },
+        { status: 400 }
+      );
+    }
+
+    // 3. Validate file size (max 5MB)
+    const maxSize = 5 * 1024 * 1024; // 5MB in bytes
+    if (file.size > maxSize) {
+      return NextResponse.json(
+        { error: "File too large. Maximum size is 5MB." },
+        { status: 400 }
+      );
+    }
+
+    console.log(`📦 Uploading ${file.name} (${(file.size / 1024).toFixed(1)}KB) to IPFS via Pinata...`);
 
     // 2. Prepare data for Pinata
     // We must convert the Web API File to a Buffer for the Node.js environment
