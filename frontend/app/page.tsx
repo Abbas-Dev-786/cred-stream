@@ -202,12 +202,14 @@ export default function LandingPage() {
                                     <div className="hidden md:block absolute top-12 left-1/2 w-full h-0.5 bg-gradient-to-r from-primary/50 to-transparent" />
                                 )}
 
+                                {/* Step number */}
+                                <div className="absolute -top-4 left-1/2 -translate-x-1/2 h-8 w-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-bold z-100">
+                                    {index + 1}
+                                </div>
+
                                 <Card className="bg-card/50 backdrop-blur-md border-border/50 relative z-10">
                                     <CardContent className="p-8 text-center">
-                                        {/* Step number */}
-                                        <div className="absolute -top-4 left-1/2 -translate-x-1/2 h-8 w-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-bold">
-                                            {index + 1}
-                                        </div>
+
 
                                         <div className="h-16 w-16 rounded-2xl bg-muted/50 flex items-center justify-center mx-auto mb-6 mt-2">
                                             <step.icon className="h-8 w-8 text-primary" />
