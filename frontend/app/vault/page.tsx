@@ -63,9 +63,17 @@ export default function VaultPage() {
         params: [CONTRACTS.vault],
     });
 
+    // 3. User's LP Shares
+    const { data: userSharesData } = useReadContract({
+        contract: vaultContract,
+        method: "function lpShares(address) view returns (uint256)",
+        params: [account?.address || ethers.ZeroAddress],
+    });
+
     // Formatted Values
     const userBalance = userBalanceData ? formatUnits(userBalanceData, 18) : "0";
     const tvl = tvlData ? formatUnits(tvlData, 18) : "0";
+    const userShares = userSharesData ? formatUnits(userSharesData, 18) : "0";
 
     // Form state
     const [amount, setAmount] = useState("");
@@ -133,7 +141,7 @@ export default function VaultPage() {
 
             const withdrawTx = prepareContractCall({
                 contract: vaultContract,
-                method: "function withdrawLiquidity(uint256 amount)",
+                method: "function withdrawLiquidity(uint256 shareAmount)",
                 params: [BigInt(withdrawAmount.toString())],
             });
 

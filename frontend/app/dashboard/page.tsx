@@ -91,7 +91,8 @@ export default function DashboardPage() {
     const [signature, setSignature] = useState("");
     const [error, setError] = useState<string | null>(null);
 
-    // Repay State
+    // Action States
+    const [financingId, setFinancingId] = useState<string | null>(null);
     const [repayingId, setRepayingId] = useState<string | null>(null);
 
     // Drag and drop state
@@ -246,19 +247,56 @@ export default function DashboardPage() {
         }
     };
 
+    // --- FINANCE INVOICE (GET LOAN) ---
+    const handleFinance = async (tokenId: string) => {
+        if (!account) return;
+        setFinancingId(tokenId);
+
+        try {
+            // 1. Approve NFT for Vault
+            const approveTx = prepareContractCall({
+                contract: nftContract,
+                method: "function approve(address to, uint256 tokenId)",
+                params: [CONTRACTS.vault, BigInt(tokenId)],
+            });
+
+            sendTx(approveTx, {
+                onSuccess: () => {
+                    // 2. Call financeInvoice on Vault
+                    const financeTx = prepareContractCall({
+                        contract: vaultContract,
+                        method: "function financeInvoice(uint256 tokenId)",
+                        params: [BigInt(tokenId)],
+                    });
+
+                    sendTx(financeTx, {
+                        onSuccess: () => {
+                            setFinancingId(null);
+                            // NFT moves to vault, refresh will remove from list
+                        },
+                        onError: (err) => {
+                            console.error(err);
+                            setFinancingId(null);
+                        }
+                    });
+                },
+                onError: (err) => {
+                    console.error(err);
+                    setFinancingId(null);
+                }
+            });
+        } catch (e) {
+            console.error(e);
+            setFinancingId(null);
+        }
+    };
+
     // --- REPAYMENT LOGIC ---
     const handleRepay = async (tokenId: string, amount: string) => {
         if (!account) return;
         setRepayingId(tokenId);
 
         try {
-            // 1. Approve Vault to spend USDy
-            // Need to approve the specific amount (or Repayment Amount)
-            // Assuming amount string is human readable, need to parse.
-            // But wait! Is 'amount' passed here normalized?
-            // Let's assume passed amount is formatted (e.g. "5000").
-            // We need to verify decimals. If principal input was 18 decimals, then here too.
-            // Safe bet: Parse as 18 decimals.
             const repayAmountWei = ethers.parseUnits(amount.replace(/,/g, ''), 18);
 
             const approveTx = prepareContractCall({
@@ -269,7 +307,6 @@ export default function DashboardPage() {
 
             sendTx(approveTx, {
                 onSuccess: () => {
-                    // 2. Repay Loan
                     const repayTx = prepareContractCall({
                         contract: vaultContract,
                         method: "function repayLoan(uint256 tokenId)",
@@ -279,7 +316,6 @@ export default function DashboardPage() {
                     sendTx(repayTx, {
                         onSuccess: () => {
                             setRepayingId(null);
-                            // Ideally refresh list
                         },
                         onError: (err) => {
                             console.error(err);
@@ -292,7 +328,6 @@ export default function DashboardPage() {
                     setRepayingId(null);
                 }
             });
-
         } catch (e) {
             console.error(e);
             setRepayingId(null);
@@ -587,24 +622,21 @@ export default function DashboardPage() {
                                     </div>
                                 )}
 
-                                {/* Real Invoices */}
+                                {/* User's Unfunded Invoices (Ready to Get Loan) */}
                                 {ownedNFTs?.map((nft) => {
-                                    // Extract amount from metadata or use default
-                                    // This depends on how the metadata is structured on IPFS
-                                    // For now, attempting to read standard traits or fallback
                                     // @ts-ignore
                                     const amountStr = nft.metadata?.attributes?.find((a: any) => a.trait_type === "Principal")?.value || "0";
-                                    const status = "active"; // Default to active since we own it
+                                    const tokenId = nft.id.toString();
 
                                     return (
                                         <InvoiceCard
-                                            key={nft.id.toString()}
-                                            id={nft.id.toString()}
+                                            key={tokenId}
+                                            id={tokenId}
                                             amount={amountStr}
-                                            status={status}
-                                            dueDate="30 Days" // Simplify for now
-                                            onRepay={() => handleRepay(nft.id.toString(), amountStr)}
-                                            isRepaying={repayingId === nft.id.toString()}
+                                            status="unfunded"
+                                            dueDate="30 Days"
+                                            onFinance={() => handleFinance(tokenId)}
+                                            isLoading={financingId === tokenId}
                                         />
                                     );
                                 })}

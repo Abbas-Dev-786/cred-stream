@@ -1,15 +1,16 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { FileText, Calendar, DollarSign, Loader2 } from "lucide-react";
+import { FileText, Calendar, DollarSign, Loader2, Banknote, ArrowLeftRight } from "lucide-react";
 
 interface InvoiceCardProps {
     id: string;
     amount: string;
-    status: "active" | "pending" | "repaid";
+    status: "unfunded" | "active" | "repaid";
     dueDate: string;
+    onFinance?: () => void;
     onRepay?: () => void;
-    isRepaying?: boolean;
+    isLoading?: boolean;
 }
 
 export function InvoiceCard({
@@ -17,18 +18,19 @@ export function InvoiceCard({
     amount,
     status,
     dueDate,
+    onFinance,
     onRepay,
-    isRepaying = false,
+    isLoading = false,
 }: InvoiceCardProps) {
     const statusColors = {
+        unfunded: "bg-accent/10 text-accent border-accent/30",
         active: "bg-primary/10 text-primary border-primary/30",
-        pending: "bg-accent/10 text-accent border-accent/30",
         repaid: "bg-muted text-muted-foreground border-muted",
     };
 
     const statusLabels = {
-        active: "Active",
-        pending: "Pending",
+        unfunded: "Ready to Fund",
+        active: "Active Loan",
         repaid: "Repaid",
     };
 
@@ -61,24 +63,46 @@ export function InvoiceCard({
                         </Badge>
                     </div>
 
-                    {/* Action */}
-                    {status === "active" && onRepay && (
-                        <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={onRepay}
-                            disabled={isRepaying}
-                            className="ml-2"
-                        >
-                            {isRepaying ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                                "Repay"
-                            )}
-                        </Button>
-                    )}
+                    {/* Actions */}
+                    <div className="flex gap-2">
+                        {status === "unfunded" && onFinance && (
+                            <Button
+                                size="sm"
+                                onClick={onFinance}
+                                disabled={isLoading}
+                                className="bg-accent hover:bg-accent/90"
+                            >
+                                {isLoading ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                    <>
+                                        <Banknote className="h-4 w-4 mr-1" />
+                                        Get Loan
+                                    </>
+                                )}
+                            </Button>
+                        )}
+                        {status === "active" && onRepay && (
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={onRepay}
+                                disabled={isLoading}
+                            >
+                                {isLoading ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                    <>
+                                        <ArrowLeftRight className="h-4 w-4 mr-1" />
+                                        Repay
+                                    </>
+                                )}
+                            </Button>
+                        )}
+                    </div>
                 </div>
             </CardContent>
         </Card>
     );
 }
+
