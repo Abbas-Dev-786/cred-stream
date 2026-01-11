@@ -1,11 +1,11 @@
 // app/api/risk-assessment/route.ts
 import { NextResponse } from "next/server";
 import { ethers } from "ethers";
-import OpenAI from "openai";
+import Groq from "groq-sdk";
 
-// Initialize OpenAI (lazy - only used if API key exists)
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY || "",
+// Initialize Groq (much faster than OpenAI, ideal for API endpoints)
+const groq = new Groq({
+  apiKey: process.env.GROQ_API_KEY || "",
 });
 
 export async function POST(req: Request) {
@@ -29,8 +29,8 @@ export async function POST(req: Request) {
     let riskScore = 0;
 
     try {
-      // Real OpenAI Call
-      const completion = await openai.chat.completions.create({
+      // Real Groq Call - Uses Llama 3.3 70B for fast, accurate risk analysis
+      const completion = await groq.chat.completions.create({
         messages: [
           {
             role: "system",
@@ -42,16 +42,16 @@ export async function POST(req: Request) {
             content: `Invoice Text: "${invoiceText}". Buyer Address: ${buyer}. Principal Amount: ${principal}.`,
           },
         ],
-        model: "gpt-3.5-turbo",
+        model: "llama-3.3-70b-versatile",
         response_format: { type: "json_object" },
       });
 
       const result = JSON.parse(completion.choices[0].message.content || "{}");
       riskScore = result.score || 85; // Fallback to 85 if parsing fails
     } catch (aiError) {
-      console.error("OpenAI Error:", aiError);
+      console.error("Groq Error:", aiError);
       console.warn(
-        "⚠️ OpenAI API failed or timed out. Using fallback scoring mechanism."
+        "⚠️ Groq API failed or timed out. Using fallback scoring mechanism."
       );
       // Fallback Logic: Simple check for demo purposes
       if (principal && Number(principal) < 100000) {
