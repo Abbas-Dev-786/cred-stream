@@ -58,6 +58,7 @@ export function InvoiceCard({
                             <DollarSign className="h-4 w-4" />
                             {amount}
                         </div>
+                        <p className="text-[10px] text-muted-foreground mb-1">0% APR (Hackathon Demo)</p>
                         <Badge variant="outline" className={statusColors[status]}>
                             {statusLabels[status]}
                         </Badge>

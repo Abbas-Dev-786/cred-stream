@@ -23,6 +23,9 @@ contract CredStreamVault is ReentrancyGuard, Ownable, IERC721Receiver {
     // --- LP ACCOUNTING ---
     mapping(address => uint256) public lpShares;
     uint256 public totalShares;
+    
+    // Total principal currently lent out (needed for correct share value calculation)
+    uint256 public totalLent;
 
     // --- LOAN TRACKING ---
     struct LoanInfo {
@@ -61,12 +64,12 @@ contract CredStreamVault is ReentrancyGuard, Ownable, IERC721Receiver {
         require(amount > 0, "Amount must be > 0");
         
         uint256 shares;
-        uint256 totalUSDy = usdyToken.balanceOf(address(this));
+        uint256 totalAssets = usdyToken.balanceOf(address(this)) + totalLent;
         
-        if (totalShares == 0 || totalUSDy == 0) {
+        if (totalShares == 0 || totalAssets == 0) {
             shares = amount; // 1:1 for first deposit
         } else {
-            shares = (amount * totalShares) / totalUSDy;
+            shares = (amount * totalShares) / totalAssets;
         }
         
         lpShares[msg.sender] += shares;
@@ -84,8 +87,10 @@ contract CredStreamVault is ReentrancyGuard, Ownable, IERC721Receiver {
         require(shareAmount > 0, "Amount must be > 0");
         require(lpShares[msg.sender] >= shareAmount, "Insufficient shares");
         
-        uint256 totalUSDy = usdyToken.balanceOf(address(this));
-        uint256 usdyAmount = (shareAmount * totalUSDy) / totalShares;
+        uint256 totalAssets = usdyToken.balanceOf(address(this)) + totalLent;
+        uint256 usdyAmount = (shareAmount * totalAssets) / totalShares;
+        
+        require(usdyToken.balanceOf(address(this)) >= usdyAmount, "Insufficient cash in vault (funds lent out)");
         
         lpShares[msg.sender] -= shareAmount;
         totalShares -= shareAmount;
@@ -139,6 +144,9 @@ contract CredStreamVault is ReentrancyGuard, Ownable, IERC721Receiver {
             "Transfer failed"
         );
 
+        // 7. Update totalLent
+        totalLent += usdyToTransfer;
+
         emit LoanDisbursed(tokenId, msg.sender, usdyToTransfer, loanAmountUSD);
     }
 
@@ -167,7 +175,15 @@ contract CredStreamVault is ReentrancyGuard, Ownable, IERC721Receiver {
         invoiceNft.markRepaid(tokenId);
 
         // Clear loan data
+        // Clear loan data
         delete loans[tokenId];
+        
+        // Update totalLent (subtract principal)
+        if (totalLent >= loan.usdyDisbursed) {
+            totalLent -= loan.usdyDisbursed;
+        } else {
+            totalLent = 0; // Safety check/Should not happen
+        }
 
         emit LoanRepaid(tokenId, loan.repaymentAmount);
     }
@@ -179,7 +195,7 @@ contract CredStreamVault is ReentrancyGuard, Ownable, IERC721Receiver {
      */
     function getShareValue(address lp) external view returns (uint256) {
         if (totalShares == 0) return 0;
-        return (lpShares[lp] * usdyToken.balanceOf(address(this))) / totalShares;
+        return (lpShares[lp] * (usdyToken.balanceOf(address(this)) + totalLent)) / totalShares;
     }
 
     // ==================== ADMIN FUNCTIONS ====================

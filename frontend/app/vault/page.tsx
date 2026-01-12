@@ -55,8 +55,17 @@ export default function VaultPage() {
         params: [account?.address || ethers.ZeroAddress],
     });
 
-    // 2. Vault TVL (USDy Balance of Vault)
-    const { data: tvlData } = useReadContract({
+
+
+    // 2. Fetch Total Lent from Vault
+    const { data: totalLentData } = useReadContract({
+        contract: vaultContract,
+        method: "function totalLent() view returns (uint256)",
+        params: [],
+    });
+
+    // 3. Vault Idle Cash (USDy Balance)
+    const { data: vaultCashData } = useReadContract({
         contract: usdyContract,
         method: "function balanceOf(address) view returns (uint256)",
         params: [CONTRACTS.vault],
@@ -77,8 +86,13 @@ export default function VaultPage() {
     });
 
     // Formatted Values
+    // Calculation: TVL = Idle Cash + Total Lent
+    const vaultCash = vaultCashData ? parseFloat(formatUnits(vaultCashData, 18)) : 0;
+    const totalLent = totalLentData ? parseFloat(formatUnits(totalLentData, 18)) : 0;
+    const tvl = vaultCash + totalLent;
+
     const userBalance = userBalanceData ? formatUnits(userBalanceData, 18) : "0";
-    const tvl = tvlData ? formatUnits(tvlData, 18) : "0";
+    // const tvl = tvlData ? formatUnits(tvlData, 18) : "0"; // Removed old TVL logic
     const userShares = userSharesData ? formatUnits(userSharesData, 18) : "0";
     const totalShares = totalSharesData ? formatUnits(totalSharesData, 18) : "0";
 
@@ -87,7 +101,7 @@ export default function VaultPage() {
         ? ((parseFloat(userShares) / parseFloat(totalShares)) * 100).toFixed(2)
         : "0";
     const userDepositValue = totalShares !== "0"
-        ? ((parseFloat(userShares) / parseFloat(totalShares)) * parseFloat(tvl)).toFixed(2)
+        ? ((parseFloat(userShares) / parseFloat(totalShares)) * tvl).toFixed(2)
         : "0";
 
     // Form state
@@ -243,6 +257,11 @@ export default function VaultPage() {
                         <p className="text-5xl sm:text-6xl font-bold text-foreground mb-4">
                             ${Number(tvl).toLocaleString(undefined, { maximumFractionDigits: 0 })}
                         </p>
+                        {totalLent > 0 && (
+                            <p className="text-xs text-muted-foreground mt-1">
+                                (Active Loans: ${Number(totalLent).toLocaleString()})
+                            </p>
+                        )}
                         <div className="flex items-center justify-center gap-2 text-accent">
                             <TrendingUp className="h-5 w-5" />
                             <span className="text-lg font-medium">Est. APY: ~8-12%</span>
