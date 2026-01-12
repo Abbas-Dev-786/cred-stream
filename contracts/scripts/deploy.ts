@@ -90,6 +90,14 @@ async function main() {
   await tx1.wait();
   console.log("👉 Granted MINTER_ROLE to Factory");
 
+  // Grant MINTER_ROLE to Vault (Required for repayLoan to mark invoices as repaid)
+  const txVault = await invoiceNft.grantRole(
+    MINTER_ROLE,
+    await vault.getAddress()
+  );
+  await txVault.wait();
+  console.log("👉 Granted MINTER_ROLE to Vault");
+
   // Seed Vault with Liquidity (If Mock)
   if (network.name === "mantleSepolia") {
     const MockERC20 = await ethers.getContractAt("MockERC20", usdyAddress);
@@ -100,10 +108,10 @@ async function main() {
     const tx3 = await MockERC20.approve(await vault.getAddress(), amount);
     await tx3.wait();
 
-    // Assuming you added a deposit function or just direct transfer
-    const tx4 = await MockERC20.transfer(await vault.getAddress(), amount);
+    // Use deposit() to mint LP shares (Direct transfer would break accounting)
+    const tx4 = await vault.deposit(amount);
     await tx4.wait();
-    console.log("👉 Seeded Vault with 50,000 Mock USDy");
+    console.log("👉 Seeded Vault with 50,000 Mock USDy (via deposit)");
   }
 
   console.log("\n🚀 DEPLOYMENT COMPLETE 🚀");
