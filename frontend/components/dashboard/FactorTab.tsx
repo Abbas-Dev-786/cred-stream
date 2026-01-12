@@ -47,6 +47,7 @@ export function FactorTab({ factoryContract, nftContract }: FactorTabProps) {
     // Process state
     const [status, setStatus] = useState<ProcessStatus>("idle");
     const [ipfsUri, setIpfsUri] = useState("");
+    const [invoiceText, setInvoiceText] = useState(""); // <--- New State
     const [riskScore, setRiskScore] = useState<number | null>(null);
     const [signature, setSignature] = useState("");
     const [error, setError] = useState<string | null>(null);
@@ -91,6 +92,7 @@ export function FactorTab({ factoryContract, nftContract }: FactorTabProps) {
         setStatus("uploading");
         setError(null);
         setUploadProgress(0);
+        setInvoiceText(""); // Reset text
 
         const formData = new FormData();
         formData.append("file", file);
@@ -130,8 +132,14 @@ export function FactorTab({ factoryContract, nftContract }: FactorTabProps) {
 
             if (data.daUri) {
                 setIpfsUri(data.daUri);
-                // toast.success("Uploaded to IPFS", { description: "Applying AI Analysis..." });
-                await handleAnalyze(data.daUri);
+                // Store the extracted text
+                if (data.text) {
+                    setInvoiceText(data.text);
+                    await handleAnalyze(data.text);
+                } else {
+                    // Fallback for analysis if text extraction failed
+                    await handleAnalyze("Could not extract text from PDF.");
+                }
             } else {
                 throw new Error(data.error || "Upload failed");
             }
@@ -152,7 +160,7 @@ export function FactorTab({ factoryContract, nftContract }: FactorTabProps) {
     };
 
     // Analyze risk
-    const handleAnalyze = async (uri?: string) => {
+    const handleAnalyze = async (textToAnalyze?: string) => {
         setStatus("analyzing");
         try {
             const res = await fetch("/api/risk-assessment", {
@@ -162,7 +170,7 @@ export function FactorTab({ factoryContract, nftContract }: FactorTabProps) {
                     supplier: account?.address,
                     principal: ethers.parseUnits(principal, 18).toString(),
                     buyer: buyer || "0x0000000000000000000000000000000000000000",
-                    invoiceText: "INVOICE DATA FROM PDF",
+                    invoiceText: textToAnalyze || invoiceText || "No text provided", // Use real text
                 }),
             });
 

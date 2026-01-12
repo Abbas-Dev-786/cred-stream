@@ -22,6 +22,7 @@ export async function POST(req: Request) {
 
     const body = await req.json();
     const { supplier, principal, buyer, invoiceText } = body;
+    console.log(`Invoice Text: ${invoiceText}`);
 
     console.log(`🤖 AI Processing Invoice for Supplier: ${supplier}`);
 
@@ -48,7 +49,8 @@ export async function POST(req: Request) {
       });
 
       const result = JSON.parse(completion.choices[0].message.content || "{}");
-      riskScore = result.score || 85; // Fallback to 85 if parsing fails
+      console.log(`Risk Score: ${result.score}`);
+      riskScore = result.score ?? 40; // Fallback to 85 if parsing fails
     } catch (aiError) {
       console.error("Groq Error:", aiError);
       console.warn(

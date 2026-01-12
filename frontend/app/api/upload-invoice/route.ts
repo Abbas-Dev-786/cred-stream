@@ -1,7 +1,42 @@
 // app/api/upload-invoice/route.ts
 import { NextResponse } from "next/server";
 import axios from "axios";
-import FormData from "form-data"; // Use the Node.js form-data library
+import FormData from "form-data";
+import PDFParser from "pdf2json";
+
+async function extractPdfText(buffer: Buffer): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const pdfParser = new PDFParser();
+
+    pdfParser.on("pdfParser_dataError", (errData: any) => {
+      reject(new Error(errData.parserError));
+    });
+
+    pdfParser.on("pdfParser_dataReady", (pdfData: any) => {
+      try {
+        let text = "";
+        pdfData.Pages.forEach((page: any) => {
+          page.Texts.forEach((textItem: any) => {
+            textItem.R.forEach((textRun: any) => {
+              try {
+                // Try to decode URI component, if it fails, use the raw text
+                text += decodeURIComponent(textRun.T) + " ";
+              } catch (e) {
+                // If decoding fails, use the raw text as fallback
+                text += textRun.T + " ";
+              }
+            });
+          });
+        });
+        resolve(text);
+      } catch (err) {
+        reject(err);
+      }
+    });
+
+    pdfParser.parseBuffer(buffer);
+  });
+}
 
 export async function POST(req: Request) {
   try {
@@ -31,16 +66,33 @@ export async function POST(req: Request) {
       );
     }
 
-    console.log(`📦 Uploading ${file.name} (${(file.size / 1024).toFixed(1)}KB) to IPFS via Pinata...`);
+    console.log(
+      `📦 Uploading ${file.name} (${(file.size / 1024).toFixed(
+        1
+      )}KB) to IPFS via Pinata...`
+    );
 
     // 2. Prepare data for Pinata
-    // We must convert the Web API File to a Buffer for the Node.js environment
     const buffer = Buffer.from(await file.arrayBuffer());
 
-    const data = new FormData();
-    data.append("file", buffer, { filename: file.name });
+    // --- Extract PDF Text ---
+    let extractedText = "";
+    try {
+      const fullText = await extractPdfText(buffer);
+      extractedText = fullText.slice(0, 3000);
+      console.log(`📄 Extracted ${extractedText.length} chars from PDF`);
+    } catch (parseError) {
+      console.error("⚠️ PDF Parse Error:", parseError);
+      extractedText = "Error extracting text from invoice PDF.";
+    }
+    // ----------------------------------------
 
-    // Optional: Add metadata to organize files in your Pinata Dashboard
+    const data = new FormData();
+    data.append("file", buffer, {
+      filename: file.name,
+    });
+
+    // Optional: Add metadata
     const metadata = JSON.stringify({
       name: `CredStream Invoice - ${file.name}`,
       keyvalues: {
@@ -62,7 +114,7 @@ export async function POST(req: Request) {
       {
         headers: {
           Authorization: `Bearer ${process.env.PINATA_JWT}`,
-          ...data.getHeaders(), // Important: Sets the correct Content-Type boundary
+          ...data.getHeaders(),
         },
         maxBodyLength: Infinity,
       }
@@ -75,9 +127,10 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       success: true,
-      daUri: ipfsUri, // Pass this string to your Smart Contract
-      gatewayUrl: `https://gateway.pinata.cloud/ipfs/${ipfsHash}`, // Use this to view the file in the browser
+      daUri: ipfsUri,
+      gatewayUrl: `https://gateway.pinata.cloud/ipfs/${ipfsHash}`,
       cid: ipfsHash,
+      text: extractedText,
     });
   } catch (error) {
     console.error("❌ IPFS Upload Error:", error);
