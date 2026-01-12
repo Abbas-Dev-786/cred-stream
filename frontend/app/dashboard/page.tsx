@@ -108,7 +108,7 @@ export default function DashboardPage() {
 
             // Query events from recent blocks (last ~10000 blocks)
             const currentBlock = await provider.getBlockNumber();
-            const fromBlock = Math.max(0, currentBlock - 10000);
+            const fromBlock = Math.max(0, currentBlock - 5000);
 
             const logs = await provider.getLogs({
                 address: vaultAddr,
@@ -358,23 +358,30 @@ export default function DashboardPage() {
         }
     };
 
+    const factoryContract = getContract({
+        client,
+        chain: MANTLE_SEPOLIA,
+        address: CONTRACTS.factory,
+    });
+
     // Mint invoice as RWA NFT
     const handleMint = async () => {
         if (!account || !signature) return;
         setStatus("minting");
         setError(null);
         setTxStep("current");
-        setError(null);
         setGasEstimate(null);
 
         try {
             // 1. Prepare Transaction
             const transaction = prepareContractCall({
-                contract: nftContract,
-                method: "function mintInvoice(address to, uint256 principal, uint256 repaymentDate, address buyer, bytes32 gstHash, bytes signature)",
+                contract: factoryContract,
+                method: "function mintVerifiedInvoice(address to, string daUri, uint256 principal, uint256 repayment, uint256 dueDate, address buyer, bytes32 gstHash, bytes aiSignature)",
                 params: [
                     account.address as `0x${string}`,
+                    ipfsUri || "mantle-da://placeholder",
                     ethers.parseUnits(principal, 18),
+                    ethers.parseUnits(principal, 18), // repayment amount (same as principal for now)
                     BigInt(Math.floor(Date.now() / 1000) + 86400 * 30),
                     (buyer || "0x0000000000000000000000000000000000000000") as `0x${string}`,
                     ethers.keccak256(ethers.toUtf8Bytes("GST_HASH_PLACEHOLDER")) as `0x${string}`, // In real app, hash of GST doc
@@ -403,9 +410,15 @@ export default function DashboardPage() {
                     }
                     toast.success("Minting Successful!");
                 },
-                onError: (err) => {
+                onError: (err: any) => {
                     console.error(err);
-                    setError("Minting failed. Please try again.");
+                    const errorMessage = err.message || "Minting failed";
+                    // Extract execution reverted message if possible
+                    if (errorMessage.includes("execution reverted")) {
+                        setError("Transaction reverted. Check inputs or approval.");
+                    } else {
+                        setError("Minting failed. Please try again.");
+                    }
                     toast.error("Minting Failed");
                     setStatus("idle");
                     setTxStep("pending");
