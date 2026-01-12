@@ -54,14 +54,74 @@ export default function DashboardPage() {
         address: CONTRACTS.usdy,
     });
 
-    // --- FETCH USER INVOICES ---
-    const { data: ownedNFTs, refetch: refetchNFTs } = useReadContract(
-        getOwnedNFTs,
-        {
-            contract: nftContract,
-            owner: account?.address || "",
+    // --- FETCH USER INVOICES (UNFUNDED) ---
+    const [ownedNFTs, setOwnedNFTs] = useState<any[]>([]);
+
+    // Fetch NFTs directly from events (because contract is not Enumerable)
+    const fetchUserInvoices = useCallback(async () => {
+        if (!account?.address) return;
+
+        try {
+            const provider = new ethers.JsonRpcProvider("https://rpc.sepolia.mantle.xyz");
+            // InvoiceNFT ABI for events and data
+            const nftInterface = new ethers.Interface([
+                "event InvoiceMinted(uint256 indexed tokenId, address indexed supplier, uint256 principal, string daUri)",
+                "event Transfer(address indexed from, address indexed to, uint256 indexed tokenId)",
+                "function ownerOf(uint256 tokenId) view returns (address)"
+            ]);
+
+            const nftAddr = CONTRACTS.nft;
+
+            // Filter for InvoiceMinted events where supplier is current user
+            // Note: This finds ALL invoices ever minted by user. 
+            // We must filter for ones currently OWNED by user (not burned, not transferred to vault).
+            const mintedFilter = nftInterface.encodeFilterTopics("InvoiceMinted", [null, account.address]);
+
+            const currentBlock = await provider.getBlockNumber();
+            const fromBlock = Math.max(0, currentBlock - 5000); // Adjust range as needed
+
+            const logs = await provider.getLogs({
+                address: nftAddr,
+                topics: mintedFilter,
+                fromBlock,
+                toBlock: "latest"
+            });
+
+            const myInvoices = [];
+
+            for (const log of logs) {
+                const parsed = nftInterface.parseLog({ topics: log.topics as string[], data: log.data });
+                if (parsed) {
+                    const tokenId = parsed.args[0].toString();
+
+                    // Verify current ownership
+                    // If financed, owner is Vault. If sold/transferred, owner is someone else.
+                    try {
+                        const contract = new ethers.Contract(nftAddr, nftInterface, provider);
+                        const currentOwner = await contract.ownerOf(tokenId);
+
+                        if (currentOwner.toLowerCase() === account.address.toLowerCase()) {
+                            myInvoices.push({
+                                id: tokenId,
+                                principal: formatUnits(parsed.args[2], 18),
+                                uri: parsed.args[3]
+                            });
+                        }
+                    } catch (e) {
+                        // Token might be burned or invalid
+                    }
+                }
+            }
+
+            setOwnedNFTs(myInvoices);
+        } catch (err) {
+            console.error("Error fetching invoices:", err);
         }
-    );
+    }, [account?.address]);
+
+    useEffect(() => {
+        fetchUserInvoices();
+    }, [fetchUserInvoices]);
 
     // --- FETCH ACTIVE LOANS ---
     const [activeLoans, setActiveLoans] = useState<any[]>([]);
@@ -150,7 +210,7 @@ export default function DashboardPage() {
                     sendTx(financeTx, {
                         onSuccess: () => {
                             setFinancingId(null);
-                            refetchNFTs();
+                            fetchUserInvoices();
                             fetchActiveLoans();
                             setActiveTab("portfolio"); // Switch to portfolio to see loan
                         },
@@ -198,7 +258,7 @@ export default function DashboardPage() {
                         onSuccess: () => {
                             setRepayingId(null);
                             fetchActiveLoans();
-                            refetchNFTs();
+                            fetchUserInvoices();
                         },
                         onError: (err) => {
                             console.error(err);
