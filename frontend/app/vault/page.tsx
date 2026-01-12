@@ -30,6 +30,20 @@ import {
     Wallet,
 } from "lucide-react";
 
+// Helper to extract revert reason
+const parseError = (error: any): string | null => {
+    if (!error) return null;
+    const msg = error.message || error.toString();
+
+    if (msg.includes("Insufficient cash in vault")) return "Vault has insufficient liquid cash (funds are lent out).";
+    if (msg.includes("Insufficient shares")) return "You do not have enough LP shares.";
+    if (msg.includes("Amount must be > 0")) return "Amount must be greater than 0.";
+    if (msg.includes("Transfer failed")) return "Token transfer failed. Check balance/allowance.";
+    if (msg.includes("user rejected")) return "Transaction rejected by user.";
+
+    return null;
+};
+
 export default function VaultPage() {
     const account = useActiveAccount();
     const { mutate: sendTx, isPending } = useSendTransaction();
@@ -141,7 +155,7 @@ export default function VaultPage() {
                         },
                         onError: (err) => {
                             console.error(err);
-                            setError("Deposit failed. Please try again.");
+                            setError(parseError(err) || "Deposit failed. Please try again.");
                             setStatus("idle");
                         },
                     });
@@ -181,7 +195,7 @@ export default function VaultPage() {
                 },
                 onError: (err) => {
                     console.error(err);
-                    setError("Withdrawal failed. Please try again.");
+                    setError(parseError(err) || "Withdrawal failed. Please try again.");
                     setStatus("idle");
                 },
             });
