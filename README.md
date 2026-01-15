@@ -182,4 +182,27 @@ This project is licensed under the MIT License.
 
 ---
 
+👥 Team Bios
+Abbas Bhanpura wala - Full Stack Blockchain Developer
+
+Role: Smart Contracts, Frontend Architecture, ZK Integration.
+
+GitHub: @Abbas-Dev-786
+
+Email: abbasbhp787@gmail.com
+
+
+⚖️ Compliance Declaration
+Regulated Assets Disclosure: This project utilizes concepts related to Real World Assets (Invoice Factoring).
+
+Current Status: This is a Proof of Concept (PoC) built for the Mantle Hackathon.
+
+Testnet Only: All "USDy" tokens used are Mock Tokens with no real-world value.
+
+Regulation: In a mainnet deployment, this protocol would require integration with a KYC/AML provider (e.g., Ondo Finance's permissioned allowlist) to comply with securities regulations regarding RWA tokenization.
+
+Privacy: We prioritize user privacy using Zero-Knowledge proofs to ensure sensitive business tax data is never exposed on the public ledger.
+
+---
+
 *Built with ❤️ for the Mantle Network Hackathon.*
