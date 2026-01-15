@@ -1,6 +1,23 @@
 # 🌊 CredStream: Decentralized Invoice Factoring on Mantle
+![Mantle Network](https://img.shields.io/badge/Network-Mantle%20Sepolia-green)
+![Category](https://img.shields.io/badge/Track-RWA%20%26%20RealFi-blue)
+![Tech](https://img.shields.io/badge/Tech-AI%20%2B%20ZK%20%2B%20IPFS-purple)
+![Status](https://img.shields.io/badge/Status-Hackathon%20Ready-orange)
+
+> **Bridging the $5.2 Trillion Trade Finance Gap with AI, ZK-Proofs, and Real World Assets.**
+
+---
 
 **CredStream** is a decentralized "RealFi" platform that bridges the $530B credit gap for MSMEs. By tokenizing invoices as **Real World Assets (RWAs)** and collateralizing them against **Ondo Finance's USDy** (Yield-bearing Stablecoin), we provide instant, permissionless liquidity to businesses while offering investors sustainable, institutional-grade yield.
+
+---
+
+
+## 📽️ Demo & Links
+
+- **🚀 Live Demo:** [https://cred-stream.vercel.app](https://cred-stream.vercel.app) 
+- **📹 Demo Video:** [YouTube] *(Replace with your video link)*
+- **📄 Pitch Deck:** [Link to Slides]
 
 ---
 
@@ -23,6 +40,7 @@ CredStream leverages a **Modular Architecture** to solve the scalability and pri
 * **🏦 LP Share System:** Liquidity providers receive proportional shares and can withdraw their USDy at any time.
 * **🔒 Gatekeeper Pattern:** Smart contracts utilize `recoverSigner` logic to ensure only AI-verified invoices are funded.
 * **📂 Modular Storage:** Invoice PDFs are pinned to IPFS, ensuring decentralization and permanence.
+* **🔐 Privacy-First Verification (ZK):** We use a **Groth16 ZK Proof** flow. The user proves they have a valid, tax-compliant invoice *locally* in their browser, and only submits the proof to the chain.
 
 ---
 
@@ -30,14 +48,12 @@ CredStream leverages a **Modular Architecture** to solve the scalability and pri
 
 | Contract | Address | Description |
 | --- | --- | --- |
-| **CredStreamVault** | `0x8dB385AFB15CEBe8f345A2F4bCDcc757E1C6EdA3` | Liquidity pool for USDy & Lending Logic |
-| **InvoiceFactory** | `0x5D934Ed328963DF0CB0b69d986c604e9BcC11cfE` | Orchestrates AI verification & Minting |
-| **InvoiceNFT** | `0x566AC179DbFD2d02769dbF5494b620Aa42e0Af59` | ERC-721 Standard for RWA Invoices |
-| **ComplianceModule** | `0x4663E1c09ea9c5120Bc757DD2478f5Ff3FcB6167` | ZK-Proof Verification Logic |
-| **USDy Oracle** | `0x...` | Price feed for USDy/USD |
-| **Mock USDy** | `0x73C68bc2635Aa369Ccb31B7a354866Ba9CA1bAbD` | Yield-bearing stablecoin simulation |
-
-> **Note:** Update addresses after redeployment.
+| **CredStreamVault** | `0x18055bA594d4721D3c26D339e4e5db01c78A7d4d` | Liquidity pool for USDy & Lending Logic |
+| **InvoiceFactory** | `0xa4BB9d7187bfC1Af0d9FD1E86D1b9910eC1cd9D2` | Orchestrates AI verification & Minting |
+| **InvoiceNFT** | `0xe42aA6D6C1917A181BFe7a20D57ea1c7499BC80D` | ERC-721 Standard for RWA Invoices |
+| **ComplianceModule** | `0x8E9cbA787DcB63776e590EbEEeA0Aa38135d2596` | ZK-Proof Verification Logic |
+| **USDy Oracle** | `0xD3Fc9303d2999e6d9de464Cf36aF39BD6b74E756` | Price feed for USDy/USD |
+| **Mock USDy** | `0xe533f14f36C58Ed745248F2A1e148405e484ce74` | Yield-bearing stablecoin simulation |
 
 ---
 
@@ -64,7 +80,7 @@ CredStream leverages a **Modular Architecture** to solve the scalability and pri
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/abbas-dev-786/cred-stream.git
+git clone https://github.com/Abbas-Dev-786/cred-stream.git
 cd cred-stream
 ```
 
