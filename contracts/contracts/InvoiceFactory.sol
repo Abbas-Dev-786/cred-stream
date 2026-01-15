@@ -45,7 +45,7 @@ contract InvoiceFactory {
         bytes memory aiSignature
     ) external {
         // 1. Check ZK Compliance
-        // require(compliance.isGSTVerified(gstHash), "Supplier not ZK-verified"); // NOTE: Disabled for Hackathon Demo flow
+        require(compliance.isGSTVerified(gstHash), "Supplier not ZK-verified");
 
         // 2. Verify AI Risk Assessment
         // The AI must have signed: keccak256(to, principal, buyer, "APPROVED")
